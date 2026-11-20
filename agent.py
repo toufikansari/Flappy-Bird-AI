@@ -18,7 +18,7 @@ else:
 
 class Agent:
     def __init__(self, params_set):
-        self.param-set = params_set
+        self.param_set = params_set
         with open("parameter.ymal", "r") as f:
             all_param_set = yaml.safe_load(f)
             params = all_param_set[params_set]
@@ -56,7 +56,7 @@ class Agent:
             # copy the wt & bias vals from policy  => target
             target_dqn.load_state_dict(policy_dqn.state_dict())
 
-            staps =  0
+            steps =  0
             self.optimizer = optim.Adam(policy_dqn.parameters(), lr=self.alpha)
 
         for episode in itertools.count():
@@ -82,13 +82,13 @@ class Agent:
                 next_state = torch.tensor(next_state, dtype=torch.float , device=device)
 
                 if is_training:
-                    memory.append((state, action, new_state,  reward , terminated))
+                    memory.append((state, action, next_state,  reward , terminated))
                     steps += 1
 
-                state = new_state
+                state = next_state
                 episode_rewards += reward
 
-            print(f"for episdoe={episode+1} total rewrd={episode_rewards} & epsilon={epsilon} ")
+            print(f"Episode={episode+1}, Reward={episode_rewards}, Epsilon={epsilon}")
 
             if is_training:
                 #epsilin dice
@@ -98,7 +98,7 @@ class Agent:
                 #get sample
                 mini_batch = memory.sample(self.mini_batch_size)
 
-                optimize(mini_batch, policy_dqn, target_dqn)
+                self.optimize(mini_batch, policy_dqn, target_dqn)
 
                 #sync the network
                 if steps > self.network_sync_rate:
@@ -123,7 +123,7 @@ class Agent:
 
         # calculate y_pred i.e Q_value from current policy
 
-        current_q = policy_dqn(states).gether(dim=1, index=actions.unsqueeze(dim=1)).squeeze()
+        current_q = policy_dqn(states).gather(dim=1, index=actions.unsqueeze(dim=1)).squeeze()
 
         # loss
         loss = self.loss_fn(current_q, target_q)
