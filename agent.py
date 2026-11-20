@@ -52,6 +52,13 @@ class Agent:
             memory = ReplyMemory(self.replay_memory_size)
             epsilon = self.epsilon_init
 
+            target_dqn =  DQN(num_state, num_action).to(device)
+            # copy the wt & bias vals from policy  => target
+            target_dqn.load_state_dict(policy_dqn.state_dict())
+
+            staps =  0
+            self.optimizer = optim.Adam(policy_dqn.parameters(), lr=self.alpha)
+
         for episode in itertools.count():
             state, _ = env.reset()
             state = torch.tensor(state, dtype=torch.float , device=device)
@@ -76,12 +83,56 @@ class Agent:
 
                 if is_training:
                     memory.append((state, action, new_state,  reward , terminated))
+                    steps += 1
 
                 state = new_state
                 episode_rewards += reward
 
             print(f"for episdoe={episode+1} total rewrd={episode_rewards} & epsilon={epsilon} ")
 
-            #epsilin dice
-            epsilon = max(epsilon *self.epsilon_decay, self.epsilon_min)
+            if is_training:
+                #epsilin dice
+                epsilon = max(epsilon *self.epsilon_decay, self.epsilon_min)
+
+            if is_training and len(memory) > self.mini_batch_size:
+                #get sample
+                mini_batch = memory.sample(self.mini_batch_size)
+
+                optimize(mini_batch, policy_dqn, target_dqn)
+
+                #sync the network
+                if steps > self.network_sync_rate:
+                    target_dqn.load_state_dict(policy_dqn.state_dict())
+                    steps = 0
             # env.close()  -- i want to manually stop
+    
+    def optimize(self ,mini_batch, policy_dqn, target_dqn ):
+        # get batch of expriences
+        states , actions, next_state, rewards, termination = zip(*mini_batch)
+
+        states = torch.stack(states)
+        actions = torch.stack(actions)
+        next_state = torch.stack(next_state)
+        rewards = torch.stack(rewards)
+        termination = torch.tensor(termination).float().to(device)
+
+        # calculation target Q value from current ploicy
+        with torch.no_grad():
+            target_q = rewards + (1-termination) * self.gamma * target_dqn(next_state).max(dim=1)[0]
+
+
+        # calculate y_pred i.e Q_value from current policy
+
+        current_q = policy_dqn(states).gether(dim=1, index=actions.unsqueeze(dim=1)).squeeze()
+
+        # loss
+        loss = self.loss_fn(current_q, target_q)
+
+        # optimezer model
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+       
+
+            
+    
