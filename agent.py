@@ -3,6 +3,7 @@ import gymnasium as gym
 from dqn import DQN
 from exprience_reply import ReplyMemory
 import torch
+import random
 import itertools
 import yaml
 import torch.nn as nn
@@ -49,24 +50,38 @@ class Agent:
 
         if is_training:
             memory = ReplyMemory(self.replay_memory_size)
+            epsilon = self.epsilon_init
 
         for episode in itertools.count():
             state, _ = env.reset()
+            state = torch.tensor(state, dtype=torch.float , device=device)
+
             episode_rewards = 0
             terminated = False
 
             while not terminated:
-            
-                action = env.action_space.sample()
+                if is_training and random.random() < epsilon:
+                    action = env.action_space.sample() # explore
+                    action = torch.tensor(action, dtype=torch.long , device=device)
+                else:
+                    with torch.no_grad():
+                        action = policy_dqn(state.unsqueeze(dim=0)).squeeze().argmax() # exploid
 
                 
-                next_state, reward, terminated, _, _ = env.step(action)
+                next_state, reward, terminated, _, _ = env.step(action.item())
+
+                #creat our tensor
+                reward = torch.tensor(reward, dtype=torch.float , device=device)
+                next_state = torch.tensor(next_state, dtype=torch.float , device=device)
 
                 if is_training:
-                    memory.append((state, action ,new_state,  reward , terminated))
+                    memory.append((state, action, new_state,  reward , terminated))
 
                 state = new_state
                 episode_rewards += reward
 
-            print(f"for episdoe={episode+1} total rewrd={episode_rewards} ")
+            print(f"for episdoe={episode+1} total rewrd={episode_rewards} & epsilon={epsilon} ")
+
+            #epsilin dice
+            epsilon = max(epsilon *self.epsilon_decay, self.epsilon_min)
             # env.close()  -- i want to manually stop
