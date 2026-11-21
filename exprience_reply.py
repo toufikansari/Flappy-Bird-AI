@@ -3,8 +3,8 @@ import random
 
 class ReplyMemory():
     # create FIFO queue
-    def __init__(self , maxlan, seed=None):
-        self.memory = deque([] , maxlan=maxlan)
+    def __init__(self , maxlen, seed=None):
+        self.memory = deque([] , maxlen=maxlen)
 
     def append(self, new_exp):
         self.memory.append(new_exp)
